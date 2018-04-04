@@ -35,11 +35,21 @@ shape = n.outputs.get_shape().as_list()
 if (shape[1] != 50) or (shape[2] != 50) or (shape[3] != 32):
     raise Exception("shape dont match")
 
-n = tl.layers.Conv2d(nin, 32, (3, 3), (2, 2), act=tf.nn.relu, name='conv2d')
+n = tl.layers.Conv2d(nin, 32, (3, 3), (2, 2), act=None, name='conv2d')
+shape = n.outputs.get_shape().as_list()
+if (shape[1] != 50) or (shape[2] != 50) or (shape[3] != 32):
+    raise Exception("shape dont match")
+n.print_params(False)
+if len(n.all_params) != 2:
+    raise Exception("params dont match")
+
+n = tl.layers.Conv2d(nin, 32, (3, 3), (2, 2), act=tf.nn.relu, b_init=None, name='conv2d_no_bias')
 print(n)
 shape = n.outputs.get_shape().as_list()
 if (shape[1] != 50) or (shape[2] != 50) or (shape[3] != 32):
     raise Exception("shape dont match")
+if len(n.all_params) != 1:
+    raise Exception("params dont match")
 
 n = tl.layers.DeConv2dLayer(nin, shape=(5, 5, 32, 3), output_shape=(100, 200, 200, 32), strides=(1, 2, 2, 1), name='deconv2dlayer')
 print(n)
@@ -111,3 +121,9 @@ if (shape[1] != 50) or (shape[2] != 50) or (shape[3] != 50) or (shape[4] != 32):
 # n = tl.layers.DeConv3dLayer(nin, shape=(2, 2, 2, 128, 3), output_shape=(100, 12, 32, 32, 128), strides=(1, 2, 2, 2, 1))
 # print(n)
 # shape = n.outputs.get_shape().as_list()
+
+n = tl.layers.DeConv3d(nin, 32, (3, 3, 3), (2, 2, 2))
+shape = n.outputs.get_shape().as_list()
+print(shape)
+if (shape[1] != 200) or (shape[2] != 200) or (shape[3] != 200) or (shape[4] != 32):
+    raise Exception("shape dont match")
