@@ -24,6 +24,7 @@ TensorLayer is a deep learning and reinforcement learning library on top of [Ten
 - Useful links: [Documentation](http://tensorlayer.readthedocs.io), [Examples](http://tensorlayer.readthedocs.io/en/latest/user/example.html), [中文文档](https://tensorlayercn.readthedocs.io), [中文书](http://www.broadview.com.cn/book/5059)
 
 # News
+* [05 Apr] Release [models APIs](http://tensorlayer.readthedocs.io/en/latest/modules/models.html#) for well-known pretained networks.
 * [18 Mar] Release experimental APIs for binary networks.
 * [18 Jan] [《深度学习：一起玩转TensorLayer》](http://www.broadview.com.cn/book/5059) (Deep Learning using TensorLayer)
 * [17 Dec] Release experimental APIs for distributed training (by [TensorPort](https://tensorport.com)). See [tiny example](https://github.com/zsdonghao/tensorlayer/blob/master/example/tutorial_mnist_distributed.py).
@@ -85,7 +86,7 @@ Examples can be found [in this folder](https://github.com/zsdonghao/tensorlayer/
  - VGG 19 (ImageNet). Classification task, see [tutorial_vgg19.py](https://github.com/zsdonghao/tensorlayer/blob/master/example/tutorial_vgg19.py).
  - InceptionV3 (ImageNet). Classification task, see [tutorial\_inceptionV3_tfslim.py](https://github.com/zsdonghao/tensorlayer/blob/master/example/tutorial_inceptionV3_tfslim.py).
  - SqueezeNet (ImageNet). Model compression, see [tl.models.SqueezeNetV1](https://github.com/zsdonghao/tensorlayer/blob/master/example/tutorial_models_squeezenetv1.py) or [tutorial_squeezenet.py](https://github.com/zsdonghao/tensorlayer/blob/master/example/tutorial_squeezenet.py)
- - MobileNet (ImageNet). Model compression, see [tutorial_mobilenet.py](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_mobilenet.py).
+ - MobileNet (ImageNet). Model compression, see [tl.models.MobileNetV1](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_models_mobilenetv1.py) or [tutorial_mobilenet.py](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_mobilenet.py).
  - BinaryNet. Model compression, see [mnist](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_binarynet_mnist_cnn.py) [cifar10](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_binarynet_cifar10_tfrecord.py).
  - Ternary Weight Network. Model compression, see [mnist](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_ternaryweight_mnist_cnn.py) [cifar10](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_ternaryweight_cifar10_tfrecord.py).
  - DoReFa-Net. Model compression, see [mnist](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_dorefanet_mnist_cnn.py) [cifar10](https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_dorefanet_cifar10_tfrecord.py).
