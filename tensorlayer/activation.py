@@ -13,6 +13,7 @@ __all__ = [
     'pixel_wise_softmax',
     'linear',
     'lrelu',
+    'prelu'
 ]
 
 
@@ -223,7 +224,32 @@ def pixel_wise_softmax(x, name='pixel_wise_softmax'):
         return tf.nn.softmax(x)
 
 
+def parametric_relu(x, name='prelu'):
+    """Parametric ReLU function.
+
+    ReLU function with a parametric slope for negative values.
+
+    Parameters
+    ----------
+    x : Tensor
+        input.
+
+    Returns
+    -------
+    Tensor
+        A ``Tensor`` in the same type as ``x``.
+
+    References
+    -------
+    see https://stackoverflow.com/questions/39975676/how-to-implement-prelu-activation-in-tensorflow
+    """
+    with tf.variable_scope(name_or_scope=scope, default_name="prelu"):
+        _alpha = tf.get_variable("alpha", shape=_x.get_shape()[-1],
+                                 dtype=_x.dtype, initializer=tf.constant_initializer(0.1))
+        return tf.nn.relu(_x) + tf.multiply(_alpha, (_x - abs(_x)))*0.5
+
 # Alias
 linear = identity
 lrelu = leaky_relu
 htanh = hard_tanh
+prelu = parametric_relu
