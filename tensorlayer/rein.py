@@ -39,12 +39,12 @@ def discount_episode_rewards(rewards=None, gamma=0.99, mode=0):
     >>> gamma = 0.9
     >>> discount_rewards = tl.rein.discount_episode_rewards(rewards, gamma)
     >>> print(discount_rewards)
-    ... [ 0.72899997  0.81        0.89999998  1.          0.72899997  0.81
-    ... 0.89999998  1.          0.72899997  0.81        0.89999998  1.        ]
+    [ 0.72899997  0.81        0.89999998  1.          0.72899997  0.81
+    0.89999998  1.          0.72899997  0.81        0.89999998  1.        ]
     >>> discount_rewards = tl.rein.discount_episode_rewards(rewards, gamma, mode=1)
     >>> print(discount_rewards)
-    ... [ 1.52110755  1.69011939  1.87791049  2.08656716  1.20729685  1.34144104
-    ... 1.49048996  1.65610003  0.72899997  0.81        0.89999998  1.        ]
+    [ 1.52110755  1.69011939  1.87791049  2.08656716  1.20729685  1.34144104
+    1.49048996  1.65610003  0.72899997  0.81        0.89999998  1.        ]
 
     """
     if rewards is None:
@@ -91,17 +91,9 @@ def cross_entropy_reward_loss(logits, actions, rewards, name=None):
     >>> train_op = tf.train.RMSPropOptimizer(learning_rate, decay_rate).minimize(loss)
 
     """
-    try:  # TF 1.0+
-        cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=actions, logits=logits, name=name)
-    except Exception:
-        cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, targets=actions)
-        # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, actions)
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=actions, logits=logits, name=name)
 
-    try:  ## TF1.0+
-        loss = tf.reduce_sum(tf.multiply(cross_entropy, rewards))
-    except Exception:  ## TF0.12
-        loss = tf.reduce_sum(tf.mul(cross_entropy, rewards))  # element-wise mul
-    return loss
+    return tf.reduce_sum(tf.multiply(cross_entropy, rewards))
 
 
 def log_weight(probs, weights, name='log_weight'):
@@ -145,17 +137,17 @@ def choice_action_by_probs(probs=(0.5, 0.5), action_list=None):
     >>> for _ in range(5):
     >>>     a = choice_action_by_probs([0.2, 0.4, 0.4])
     >>>     print(a)
-    ... 0
-    ... 1
-    ... 1
-    ... 2
-    ... 1
+    0
+    1
+    1
+    2
+    1
     >>> for _ in range(3):
     >>>     a = choice_action_by_probs([0.5, 0.5], ['a', 'b'])
     >>>     print(a)
-    ... a
-    ... b
-    ... b
+    a
+    b
+    b
 
     """
     if action_list is None:

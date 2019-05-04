@@ -12,7 +12,7 @@ __all__ = [
 ]
 
 
-def minibatches(inputs=None, targets=None, batch_size=None, shuffle=False):
+def minibatches(inputs=None, targets=None, batch_size=None, allow_dynamic_batch_size=False, shuffle=False):
     """Generate a generator that input a group of example in numpy.array and
     their labels, return the examples and labels by the given batch size.
 
@@ -24,6 +24,8 @@ def minibatches(inputs=None, targets=None, batch_size=None, shuffle=False):
         The labels of inputs, every row is a example.
     batch_size : int
         The batch size.
+    allow_dynamic_batch_size: boolean
+        Allow the use of the last data batch in case the number of examples is not a multiple of batch_size, this may result in unexpected behaviour if other functions expect a fixed-sized batch-size.
     shuffle : boolean
         Indicating whether to use a shuffling queue, shuffle the dataset before return.
 
@@ -33,16 +35,9 @@ def minibatches(inputs=None, targets=None, batch_size=None, shuffle=False):
     >>> y = np.asarray([0,1,2,3,4,5])
     >>> for batch in tl.iterate.minibatches(inputs=X, targets=y, batch_size=2, shuffle=False):
     >>>     print(batch)
-    ... (array([['a', 'a'],
-    ...        ['b', 'b']],
-    ...         dtype='<U1'), array([0, 1]))
-    ... (array([['c', 'c'],
-    ...        ['d', 'd']],
-    ...         dtype='<U1'), array([2, 3]))
-    ... (array([['e', 'e'],
-    ...        ['f', 'f']],
-    ...         dtype='<U1'), array([4, 5]))
-
+    (array([['a', 'a'], ['b', 'b']], dtype='<U1'), array([0, 1]))
+    (array([['c', 'c'], ['d', 'd']], dtype='<U1'), array([2, 3]))
+    (array([['e', 'e'], ['f', 'f']], dtype='<U1'), array([4, 5]))
 
     Notes
     -----
@@ -50,17 +45,29 @@ def minibatches(inputs=None, targets=None, batch_size=None, shuffle=False):
     into (1000, 180) and feed to ``inputs``. After getting a batch, you can split it back into X1 and X2.
 
     """
-    assert len(inputs) == len(targets)
+    if len(inputs) != len(targets):
+        raise AssertionError("The length of inputs and targets should be equal")
+
     if shuffle:
         indices = np.arange(len(inputs))
         np.random.shuffle(indices)
-    for start_idx in range(0, len(inputs) - batch_size + 1, batch_size):
+
+    # for start_idx in range(0, len(inputs) - batch_size + 1, batch_size):
+    # chulei: handling the case where the number of samples is not a multiple of batch_size, avoiding wasting samples
+    for start_idx in range(0, len(inputs), batch_size):
+        end_idx = start_idx + batch_size
+        if end_idx > len(inputs):
+            if allow_dynamic_batch_size:
+                end_idx = len(inputs)
+            else:
+                break
         if shuffle:
-            excerpt = indices[start_idx:start_idx + batch_size]
+            excerpt = indices[start_idx:end_idx]
         else:
-            excerpt = slice(start_idx, start_idx + batch_size)
-        if (isinstance(inputs, list) or isinstance(targets, list)) and (shuffle == True):
-            yield [inputs[i] for i in excerpt], [targets[i] for i in excerpt]  # zsdonghao: for list indexing when shuffle==True
+            excerpt = slice(start_idx, end_idx)
+        if (isinstance(inputs, list) or isinstance(targets, list)) and (shuffle ==True):
+            # zsdonghao: for list indexing when shuffle==True
+            yield [inputs[i] for i in excerpt], [targets[i] for i in excerpt]
         else:
             yield inputs[excerpt], targets[excerpt]
 
@@ -90,18 +97,8 @@ def seq_minibatches(inputs, targets, batch_size, seq_length, stride=1):
     >>> y = np.asarray([0, 1, 2, 3, 4, 5])
     >>> for batch in tl.iterate.seq_minibatches(inputs=X, targets=y, batch_size=2, seq_length=2, stride=1):
     >>>     print(batch)
-    ... (array([['a', 'a'],
-    ...        ['b', 'b'],
-    ...         ['b', 'b'],
-    ...         ['c', 'c']],
-    ...         dtype='<U1'), array([0, 1, 1, 2]))
-    ... (array([['c', 'c'],
-    ...         ['d', 'd'],
-    ...         ['d', 'd'],
-    ...         ['e', 'e']],
-    ...         dtype='<U1'), array([2, 3, 3, 4]))
-    ...
-    ...
+    (array([['a', 'a'], ['b', 'b'], ['b', 'b'], ['c', 'c']], dtype='<U1'), array([0, 1, 1, 2]))
+    (array([['c', 'c'], ['d', 'd'], ['d', 'd'], ['e', 'e']], dtype='<U1'), array([2, 3, 3, 4]))
 
     Many to One
 
@@ -115,18 +112,21 @@ def seq_minibatches(inputs, targets, batch_size, seq_length, stride=1):
     >>>         tmp_y = y.reshape((-1, num_steps) + y.shape[1:])
     >>>     y = tmp_y[:, -1]
     >>>     print(x, y)
-    ... [['a' 'a']
-    ... ['b' 'b']
-    ... ['b' 'b']
-    ... ['c' 'c']] [1 2]
-    ... [['c' 'c']
-    ... ['d' 'd']
-    ... ['d' 'd']
-    ... ['e' 'e']] [3 4]
+    [['a' 'a']
+    ['b' 'b']
+    ['b' 'b']
+    ['c' 'c']] [1 2]
+    [['c' 'c']
+    ['d' 'd']
+    ['d' 'd']
+    ['e' 'e']] [3 4]
 
     """
-    assert len(inputs) == len(targets)
+    if len(inputs) != len(targets):
+        raise AssertionError("The length of inputs and targets should be equal")
+
     n_loads = (batch_size * stride) + (seq_length - stride)
+
     for start_idx in range(0, len(inputs) - n_loads + 1, (batch_size * stride)):
         seq_inputs = np.zeros((batch_size, seq_length) + inputs.shape[1:], dtype=inputs.dtype)
         seq_targets = np.zeros((batch_size, seq_length) + targets.shape[1:], dtype=targets.dtype)
@@ -171,27 +171,29 @@ def seq_minibatches2(inputs, targets, batch_size, num_steps):
     >>> for batch in tl.iterate.seq_minibatches2(X, Y, batch_size=2, num_steps=3):
     ...     x, y = batch
     ...     print(x, y)
-    ...
-    ... [[  0.   1.   2.]
-    ... [ 10.  11.  12.]]
-    ... [[ 20.  21.  22.]
-    ... [ 30.  31.  32.]]
-    ...
-    ... [[  3.   4.   5.]
-    ... [ 13.  14.  15.]]
-    ... [[ 23.  24.  25.]
-    ... [ 33.  34.  35.]]
-    ...
-    ... [[  6.   7.   8.]
-    ... [ 16.  17.  18.]]
-    ... [[ 26.  27.  28.]
-    ... [ 36.  37.  38.]]
+
+    [[  0.   1.   2.]
+    [ 10.  11.  12.]]
+    [[ 20.  21.  22.]
+    [ 30.  31.  32.]]
+
+    [[  3.   4.   5.]
+    [ 13.  14.  15.]]
+    [[ 23.  24.  25.]
+    [ 33.  34.  35.]]
+
+    [[  6.   7.   8.]
+    [ 16.  17.  18.]]
+    [[ 26.  27.  28.]
+    [ 36.  37.  38.]]
 
     Notes
     -----
     - Hint, if the input data are images, you can modify the source code `data = np.zeros([batch_size, batch_len)` to `data = np.zeros([batch_size, batch_len, inputs.shape[1], inputs.shape[2], inputs.shape[3]])`.
     """
-    assert len(inputs) == len(targets)
+    if len(inputs) != len(targets):
+        raise AssertionError("The length of inputs and targets should be equal")
+
     data_len = len(inputs)
     batch_len = data_len // batch_size
     # data = np.zeros([batch_size, batch_len])
@@ -247,20 +249,20 @@ def ptb_iterator(raw_data, batch_size, num_steps):
     >>> for batch in tl.iterate.ptb_iterator(train_data, batch_size=2, num_steps=3):
     >>>     x, y = batch
     >>>     print(x, y)
-    ... [[ 0  1  2] <---x                       1st subset/ iteration
-    ...  [10 11 12]]
-    ... [[ 1  2  3] <---y
-    ...  [11 12 13]]
-    ...
-    ... [[ 3  4  5]  <--- 1st batch input       2nd subset/ iteration
-    ...  [13 14 15]] <--- 2nd batch input
-    ... [[ 4  5  6]  <--- 1st batch target
-    ...  [14 15 16]] <--- 2nd batch target
-    ...
-    ... [[ 6  7  8]                             3rd subset/ iteration
-    ...  [16 17 18]]
-    ... [[ 7  8  9]
-    ...  [17 18 19]]
+    [[ 0  1  2] <---x                       1st subset/ iteration
+     [10 11 12]]
+    [[ 1  2  3] <---y
+     [11 12 13]]
+
+    [[ 3  4  5]  <--- 1st batch input       2nd subset/ iteration
+     [13 14 15]] <--- 2nd batch input
+    [[ 4  5  6]  <--- 1st batch target
+     [14 15 16]] <--- 2nd batch target
+
+    [[ 6  7  8]                             3rd subset/ iteration
+     [16 17 18]]
+    [[ 7  8  9]
+     [17 18 19]]
     """
     raw_data = np.array(raw_data, dtype=np.int32)
 

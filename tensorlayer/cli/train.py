@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# encoding: utf-8
+#! /usr/bin/python
+# -*- coding: utf-8 -*-
 """
 tl train
 ========
@@ -108,10 +108,12 @@ def create_tf_jobs(cluster_spec, prog, args):
     for job_type in cluster_spec:
         for task_index in range(len(cluster_spec[job_type])):
             new_env = os.environ.copy()
-            new_env.update({
-                'CUDA_VISIBLE_DEVICES': str(gpu_assignment.get((job_type, task_index), '')),
-                'TF_CONFIG': json.dumps(create_tf_config(cluster_spec, job_type, task_index)),
-            })
+            new_env.update(
+                {
+                    'CUDA_VISIBLE_DEVICES': str(gpu_assignment.get((job_type, task_index), '')),
+                    'TF_CONFIG': json.dumps(create_tf_config(cluster_spec, job_type, task_index)),
+                }
+            )
             yield subprocess.Popen(['python3', prog] + args, env=new_env)
 
 
@@ -137,8 +139,8 @@ def main(args):
     print('Using program %s with args %s' % (args.file, ' '.join(args.args)))
     print('Using %d workers, %d parameter servers, %d GPUs.' % (num_workers, args.num_pss, len(GPU_IDS)))
     cluster_spec = {
-        'ps': ['localhost:%d' % (PORT_BASE + i) for i in range(args.num_pss)],
-        'worker': ['localhost:%d' % (PORT_BASE + args.num_pss + i) for i in range(num_workers)]
+        'ps': ['localhost: %d' % (PORT_BASE + i) for i in range(args.num_pss)],
+        'worker': ['localhost: %d' % (PORT_BASE + args.num_pss + i) for i in range(num_workers)]
     }
     processes = list(create_tf_jobs(cluster_spec, args.file, args.args))
     try:

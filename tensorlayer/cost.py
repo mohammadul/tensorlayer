@@ -1,8 +1,13 @@
+#! /usr/bin/python
 # -*- coding: utf-8 -*-
 
-import logging
+import numbers
 
 import tensorflow as tf
+from tensorflow.python.framework import ops
+from tensorflow.python.ops import standard_ops, math_ops, nn_ops, array_ops
+
+from tensorlayer import logging
 
 __all__ = [
     'cross_entropy',
@@ -26,8 +31,8 @@ __all__ = [
 
 
 def cross_entropy(output, target, name=None):
-    """Softmax cross-entropy operation, returns the TensorFlow expression of cross-entropy for two distributions, it implements
-    softmax internally. See ``tf.nn.sparse_softmax_cross_entropy_with_logits``.
+    """Softmax cross-entropy operation, returns the TensorFlow expression of cross-entropy for two distributions,
+    it implements softmax internally. See ``tf.nn.sparse_softmax_cross_entropy_with_logits``.
 
     Parameters
     ----------
@@ -40,6 +45,7 @@ def cross_entropy(output, target, name=None):
 
     Examples
     --------
+    >>> import tensorlayer as tl
     >>> ce = tl.cost.cross_entropy(y_logits, y_target_logits, 'my_loss')
 
     References
@@ -48,12 +54,9 @@ def cross_entropy(output, target, name=None):
     - The code is borrowed from: `<https://en.wikipedia.org/wiki/Cross_entropy>`__.
 
     """
-    # try: # old
-    #     return tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=output, targets=target))
-    # except: # TF 1.0
-    if name is None:
-        raise Exception("Please give a unique name to tl.cost.cross_entropy for TF1.0+")
-    return tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=target, logits=output, name=name))
+    # if name is None:
+    #     raise Exception("Please give a unique name to tl.cost.cross_entropy for TF1.0+")
+    return tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=target, logits=output), name=name)
 
 
 def sigmoid_cross_entropy(output, target, name=None):
@@ -69,10 +72,7 @@ def sigmoid_cross_entropy(output, target, name=None):
         Name of this loss.
 
     """
-    # try: # TF 1.0
-    return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=target, logits=output, name=name))
-    # except:
-    #     return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=output, targets=target))
+    return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=target, logits=output), name=name)
 
 
 def binary_cross_entropy(output, target, epsilon=1e-8, name='bce_loss'):
@@ -94,19 +94,23 @@ def binary_cross_entropy(output, target, epsilon=1e-8, name='bce_loss'):
     - `ericjang-DRAW <https://github.com/ericjang/draw/blob/master/draw.py#L73>`__
 
     """
-    #     from tensorflow.python.framework import ops
     #     with ops.op_scope([output, target], name, "bce_loss") as name:
     #         output = ops.convert_to_tensor(output, name="preds")
     #         target = ops.convert_to_tensor(targets, name="target")
-    with tf.name_scope(name):
-        return tf.reduce_mean(tf.reduce_sum(-(target * tf.log(output + epsilon) + (1. - target) * tf.log(1. - output + epsilon)), axis=1))
+
+    # with tf.name_scope(name):
+    return tf.reduce_mean(
+        tf.reduce_sum(
+            -(target * tf.math.log(output + epsilon) + (1. - target) * tf.math.log(1. - output + epsilon)), axis=1
+        ), name=name
+    )
 
     # For brevity, let `x = output`, `z = target`.  The binary cross entropy loss is
     #
     #     loss(x, z) = - sum_i (x[i] * log(z[i]) + (1 - x[i]) * log(1 - z[i]))
 
 
-def mean_squared_error(output, target, is_mean=False, name="mean_squared_error"):
+def mean_squared_error(output, target, is_mean=False, axis=-1, name="mean_squared_error"):
     """Return the TensorFlow expression of mean-square-error (L2) of two batch of data.
 
     Parameters
@@ -119,34 +123,34 @@ def mean_squared_error(output, target, is_mean=False, name="mean_squared_error")
         Whether compute the mean or sum for each example.
             - If True, use ``tf.reduce_mean`` to compute the loss between one target and predict data.
             - If False, use ``tf.reduce_sum`` (default).
+    axis : int or list of int
+        The dimensions to reduce.
+    name : str
+        An optional name to attach to this function.
 
     References
     ------------
     - `Wiki Mean Squared Error <https://en.wikipedia.org/wiki/Mean_squared_error>`__
 
     """
-    with tf.name_scope(name):
-        if output.get_shape().ndims == 2:  # [batch_size, n_feature]
-            if is_mean:
-                mse = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(output, target), 1))
-            else:
-                mse = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(output, target), 1))
-        elif output.get_shape().ndims == 3:  # [batch_size, w, h]
-            if is_mean:
-                mse = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(output, target), [1, 2]))
-            else:
-                mse = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(output, target), [1, 2]))
-        elif output.get_shape().ndims == 4:  # [batch_size, w, h, c]
-            if is_mean:
-                mse = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(output, target), [1, 2, 3]))
-            else:
-                mse = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(output, target), [1, 2, 3]))
-        else:
-            raise Exception("Unknow dimension")
-        return mse
+    # with tf.name_scope(name):
+    # if len(output.shape) == 2:  # [batch_size, n_feature]
+    #     axis = 1
+    # elif len(output.shape) == 3:  # [batch_size, w, h]
+    #     axis = [1, 2]
+    # elif len(output.shape) == 4:  # [batch_size, w, h, c]
+    #     axis = [1, 2, 3]
+    # else:
+    #     raise Exception("Unknow dimension")
+
+    if is_mean:
+        mse = tf.reduce_mean(tf.reduce_mean(tf.math.squared_difference(output, target), axis), name=name)
+    else:
+        mse = tf.reduce_mean(tf.reduce_sum(tf.math.squared_difference(output, target), axis), name=name)
+    return mse
 
 
-def normalized_mean_square_error(output, target):
+def normalized_mean_square_error(output, target, axis=-1, name="normalized_mean_squared_error_loss"):
     """Return the TensorFlow expression of normalized mean-square-error of two distributions.
 
     Parameters
@@ -155,23 +159,26 @@ def normalized_mean_square_error(output, target):
         2D, 3D or 4D tensor i.e. [batch_size, n_feature], [batch_size, height, width] or [batch_size, height, width, channel].
     target : Tensor
         The target distribution, format the same with `output`.
+    axis : int or list of int
+        The dimensions to reduce.
+    name : str
+        An optional name to attach to this function.
 
     """
-    with tf.name_scope("mean_squared_error_loss"):
-        if output.get_shape().ndims == 2:  # [batch_size, n_feature]
-            nmse_a = tf.sqrt(tf.reduce_sum(tf.squared_difference(output, target), axis=1))
-            nmse_b = tf.sqrt(tf.reduce_sum(tf.square(target), axis=1))
-        elif output.get_shape().ndims == 3:  # [batch_size, w, h]
-            nmse_a = tf.sqrt(tf.reduce_sum(tf.squared_difference(output, target), axis=[1, 2]))
-            nmse_b = tf.sqrt(tf.reduce_sum(tf.square(target), axis=[1, 2]))
-        elif output.get_shape().ndims == 4:  # [batch_size, w, h, c]
-            nmse_a = tf.sqrt(tf.reduce_sum(tf.squared_difference(output, target), axis=[1, 2, 3]))
-            nmse_b = tf.sqrt(tf.reduce_sum(tf.square(target), axis=[1, 2, 3]))
-        nmse = tf.reduce_mean(nmse_a / nmse_b)
+    with tf.name_scope("normalized_mean_squared_error_loss"):
+        # if len(output.shape) == 2:  # [batch_size, n_feature]
+        #     axis = 1
+        # elif len(output.shape) == 3:  # [batch_size, w, h]
+        #     axis = [1, 2]
+        # elif len(output.shape) == 4:  # [batch_size, w, h, c]
+        #     axis = [1, 2, 3]
+        nmse_a = tf.sqrt(tf.reduce_sum(tf.math.squared_difference(output, target), axis=axis))
+        nmse_b = tf.sqrt(tf.reduce_sum(tf.square(target), axis=axis))
+        nmse = tf.reduce_mean(nmse_a / nmse_b, name=name)
     return nmse
 
 
-def absolute_difference_error(output, target, is_mean=False):
+def absolute_difference_error(output, target, is_mean=False, axis=-1, name="absolute_difference_error_loss"):
     """Return the TensorFlow expression of absolute difference error (L1) of two batch of data.
 
     Parameters
@@ -184,27 +191,26 @@ def absolute_difference_error(output, target, is_mean=False):
         Whether compute the mean or sum for each example.
             - If True, use ``tf.reduce_mean`` to compute the loss between one target and predict data.
             - If False, use ``tf.reduce_sum`` (default).
+    axis : int or list of int
+        The dimensions to reduce.
+    name : str
+        An optional name to attach to this function.
 
     """
-    with tf.name_scope("mean_squared_error_loss"):
-        if output.get_shape().ndims == 2:  # [batch_size, n_feature]
-            if is_mean:
-                loss = tf.reduce_mean(tf.reduce_mean(tf.abs(output - target), 1))
-            else:
-                loss = tf.reduce_mean(tf.reduce_sum(tf.abs(output - target), 1))
-        elif output.get_shape().ndims == 3:  # [batch_size, w, h]
-            if is_mean:
-                loss = tf.reduce_mean(tf.reduce_mean(tf.abs(output - target), [1, 2]))
-            else:
-                loss = tf.reduce_mean(tf.reduce_sum(tf.abs(output - target), [1, 2]))
-        elif output.get_shape().ndims == 4:  # [batch_size, w, h, c]
-            if is_mean:
-                loss = tf.reduce_mean(tf.reduce_mean(tf.abs(output - target), [1, 2, 3]))
-            else:
-                loss = tf.reduce_mean(tf.reduce_sum(tf.abs(output - target), [1, 2, 3]))
-        else:
-            raise Exception("Unknow dimension")
-        return loss
+    # # with tf.name_scope("absolute_difference_error_loss"):
+    # if len(output.shape) == 2:  # [batch_size, n_feature]
+    #     axis = 1
+    # elif len(output.shape) == 3:  # [batch_size, w, h]
+    #     axis = [1, 2]
+    # elif len(output.shape) == 4:  # [batch_size, w, h, c]
+    #     axis = [1, 2, 3]
+    # else:
+    #     raise Exception("Unknow dimension")
+    if is_mean:
+        loss = tf.reduce_mean(tf.reduce_mean(tf.abs(output - target), axis), name=name)
+    else:
+        loss = tf.reduce_mean(tf.reduce_sum(tf.abs(output - target), axis), name=name)
+    return loss
 
 
 def dice_coe(output, target, loss_type='jaccard', axis=(1, 2, 3), smooth=1e-5):
@@ -229,7 +235,8 @@ def dice_coe(output, target, loss_type='jaccard', axis=(1, 2, 3), smooth=1e-5):
 
     Examples
     ---------
-    >>> outputs = tl.act.pixel_wise_softmax(network.outputs)
+    >>> import tensorlayer as tl
+    >>> outputs = tl.act.pixel_wise_softmax(outputs)
     >>> dice_loss = 1 - tl.cost.dice_coe(outputs, y_)
 
     References
@@ -246,14 +253,14 @@ def dice_coe(output, target, loss_type='jaccard', axis=(1, 2, 3), smooth=1e-5):
         r = tf.reduce_sum(target, axis=axis)
     else:
         raise Exception("Unknow loss_type")
-    ## old axis=[0,1,2,3]
+    # old axis=[0,1,2,3]
     # dice = 2 * (inse) / (l + r)
     # epsilon = 1e-5
     # dice = tf.clip_by_value(dice, 0, 1.0-epsilon) # if all empty, dice = 1
-    ## new haodong
+    # new haodong
     dice = (2. * inse + smooth) / (l + r + smooth)
     ##
-    dice = tf.reduce_mean(dice)
+    dice = tf.reduce_mean(dice, name='dice_coe')
     return dice
 
 
@@ -285,14 +292,14 @@ def dice_hard_coe(output, target, threshold=0.5, axis=(1, 2, 3), smooth=1e-5):
     inse = tf.reduce_sum(tf.multiply(output, target), axis=axis)
     l = tf.reduce_sum(output, axis=axis)
     r = tf.reduce_sum(target, axis=axis)
-    ## old axis=[0,1,2,3]
+    # old axis=[0,1,2,3]
     # hard_dice = 2 * (inse) / (l + r)
     # epsilon = 1e-5
     # hard_dice = tf.clip_by_value(hard_dice, 0, 1.0-epsilon)
-    ## new haodong
+    # new haodong
     hard_dice = (2. * inse + smooth) / (l + r + smooth)
     ##
-    hard_dice = tf.reduce_mean(hard_dice)
+    hard_dice = tf.reduce_mean(hard_dice, name='hard_dice')
     return hard_dice
 
 
@@ -323,13 +330,13 @@ def iou_coe(output, target, threshold=0.5, axis=(1, 2, 3), smooth=1e-5):
     truth = tf.cast(target > threshold, dtype=tf.float32)
     inse = tf.reduce_sum(tf.multiply(pre, truth), axis=axis)  # AND
     union = tf.reduce_sum(tf.cast(tf.add(pre, truth) >= 1, dtype=tf.float32), axis=axis)  # OR
-    ## old axis=[0,1,2,3]
+    # old axis=[0,1,2,3]
     # epsilon = 1e-5
     # batch_iou = inse / (union + epsilon)
-    ## new haodong
+    # new haodong
     batch_iou = (inse + smooth) / (union + smooth)
-    iou = tf.reduce_mean(batch_iou)
-    return iou  #, pre, truth, inse, union
+    iou = tf.reduce_mean(batch_iou, name='iou_coe')
+    return iou  # , pre, truth, inse, union
 
 
 # ## test soft/hard dice and iou
@@ -366,9 +373,65 @@ def iou_coe(output, target, threshold=0.5, axis=(1, 2, 3), smooth=1e-5):
 # exit()
 
 
-def cross_entropy_seq(logits, target_seqs, batch_size=None):  #, batch_size=1, num_steps=None):
+def sequence_loss_by_example(
+        logits, targets, weights, average_across_timesteps=True, softmax_loss_function=None, name=None
+):
+    """Weighted cross-entropy loss for a sequence of logits (per example). see original tensorflow code :
+    <https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/legacy_seq2seq/python/ops/seq2seq.py#L1057>
+
+    Parameters
+    ----------
+    logits: List
+        List of 2D Tensors of shape [batch_size x num_decoder_symbols].
+    targets: List
+        List of 1D batch-sized int32 Tensors of the same length as logits.
+    weights: List
+        List of 1D batch-sized float-Tensors of the same length as logits.
+    average_across_timesteps: Boolean
+        If set, divide the returned cost by the total label weight.
+    softmax_loss_function: None or Function
+        Function (labels, logits) -> loss-batch to be used instead of the standard softmax (the default if this is None).
+        **Note that to avoid confusion, it is required for the function to accept named arguments.**
+    name: None or str
+        Optional name for this operation, default: "sequence_loss_by_example".
+
+    Returns
+    -------
+    1D batch-sized float Tensor: The log-perplexity for each sequence.
+
+    Raises
+    ------
+    ValueError: If len(logits) is different from len(targets) or len(weights).
+
+    """
+    if len(targets) != len(logits) or len(weights) != len(logits):
+        raise ValueError(
+            "Lengths of logits, weights, and targets must be the same "
+            "%d, %d, %d." % (len(logits), len(weights), len(targets))
+        )
+    with ops.name_scope(name, "sequence_loss_by_example", logits + targets + weights):
+        log_perp_list = []
+        for logit, target, weight in zip(logits, targets, weights):
+            if softmax_loss_function is None:
+                # TODO(irving,ebrevdo): This reshape is needed because
+                # sequence_loss_by_example is called with scalars sometimes, which
+                # violates our general scalar strictness policy.
+                target = array_ops.reshape(target, [-1])
+                crossent = nn_ops.sparse_softmax_cross_entropy_with_logits(labels=target, logits=logit)
+            else:
+                crossent = softmax_loss_function(labels=target, logits=logit)
+            log_perp_list.append(crossent * weight)
+    log_perps = math_ops.add_n(log_perp_list)
+    if average_across_timesteps:
+        total_size = math_ops.add_n(weights)
+        total_size += 1e-12  # Just to avoid division by 0 for all-0 weights.
+        log_perps /= total_size
+    return log_perps
+
+
+def cross_entropy_seq(logits, target_seqs, batch_size=None):
     """Returns the expression of cross-entropy of two sequences, implement
-    softmax internally. Normally be used for fixed length RNN outputs, see `PTB example <https://github.com/zsdonghao/tensorlayer/blob/master/example/tutorial_ptb_lstm_state_is_tuple.py>`__.
+    softmax internally. Normally be used for fixed length RNN outputs, see `PTB example <https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_ptb_lstm_state_is_tuple.py>`__.
 
     Parameters
     ----------
@@ -383,23 +446,20 @@ def cross_entropy_seq(logits, target_seqs, batch_size=None):  #, batch_size=1, n
 
     Examples
     --------
-    >>> see `PTB example <https://github.com/zsdonghao/tensorlayer/blob/master/example/tutorial_ptb_lstm_state_is_tuple.py>`__.for more details
-    >>> input_data = tf.placeholder(tf.int32, [batch_size, n_steps])
-    >>> targets = tf.placeholder(tf.int32, [batch_size, n_steps])
-    >>> # build the network
-    >>> print(net.outputs)
-    ... (batch_size * n_steps, n_classes)
-    >>> cost = tl.cost.cross_entropy_seq(network.outputs, targets)
+    >>> import tensorlayer as tl
+    >>> # see `PTB example <https://github.com/tensorlayer/tensorlayer/blob/master/example/tutorial_ptb_lstm_state_is_tuple.py>`__.for more details
+    >>> # outputs shape : (batch_size * n_steps, n_classes)
+    >>> # targets shape : (batch_size, n_steps)
+    >>> cost = tl.cost.cross_entropy_seq(outputs, targets)
 
     """
-    # try: # TF 1.0
-    sequence_loss_by_example_fn = tf.contrib.legacy_seq2seq.sequence_loss_by_example
-    # except:
-    #     sequence_loss_by_example_fn = tf.nn.seq2seq.sequence_loss_by_example
+    sequence_loss_by_example_fn = sequence_loss_by_example
 
-    loss = sequence_loss_by_example_fn([logits], [tf.reshape(target_seqs, [-1])], [tf.ones_like(tf.reshape(target_seqs, [-1]), dtype=tf.float32)])
+    loss = sequence_loss_by_example_fn(
+        [logits], [tf.reshape(target_seqs, [-1])], [tf.ones_like(tf.reshape(target_seqs, [-1]), dtype=tf.float32)]
+    )
     # [tf.ones([batch_size * num_steps])])
-    cost = tf.reduce_sum(loss)  #/ batch_size
+    cost = tf.reduce_sum(loss)  # / batch_size
     if batch_size is not None:
         cost = cost / batch_size
     return cost
@@ -425,46 +485,41 @@ def cross_entropy_seq_with_mask(logits, target_seqs, input_mask, return_details=
 
     Examples
     --------
+    >>> import tensorlayer as tl
+    >>> import tensorflow as tf
+    >>> import numpy as np
     >>> batch_size = 64
     >>> vocab_size = 10000
     >>> embedding_size = 256
-    >>> input_seqs = tf.placeholder(dtype=tf.int64, shape=[batch_size, None], name="input")
-    >>> target_seqs = tf.placeholder(dtype=tf.int64, shape=[batch_size, None], name="target")
-    >>> input_mask = tf.placeholder(dtype=tf.int64, shape=[batch_size, None], name="mask")
-    >>> net = tl.layers.EmbeddingInputlayer(
-    ...         inputs = input_seqs,
+    >>> ni = tl.layers.Input([batch_size, None], dtype=tf.int64)
+    >>> net = tl.layers.Embedding(
     ...         vocabulary_size = vocab_size,
     ...         embedding_size = embedding_size,
-    ...         name = 'seq_embedding')
-    >>> net = tl.layers.DynamicRNNLayer(net,
-    ...         cell_fn = tf.contrib.rnn.BasicLSTMCell,
-    ...         n_hidden = embedding_size,
-    ...         dropout = (0.7 if is_train else None),
-    ...         sequence_length = tl.layers.retrieve_seq_length_op2(input_seqs),
+    ...         name = 'seq_embedding')(ni)
+    >>> net = tl.layers.RNN(
+    ...         cell =tf.keras.layers.LSTMCell(units=embedding_size, dropout=0.1),
     ...         return_seq_2d = True,
-    ...         name = 'dynamicrnn')
-    >>> print(net.outputs)
-    ... (?, 256)
-    >>> net = tl.layers.DenseLayer(net, n_units=vocab_size, name="output")
-    >>> print(net.outputs)
-    ... (?, 10000)
-    >>> loss = tl.cost.cross_entropy_seq_with_mask(net.outputs, target_seqs, input_mask)
+    ...         name = 'dynamicrnn')(net)
+    >>> net = tl.layers.Dense(n_units=vocab_size, name="output")(net)
+    >>> model = tl.models.Model(inputs=ni, outputs=net)
+    >>> input_seqs = np.random.randint(0, 10, size=(batch_size, 10), dtype=np.int64)
+    >>> target_seqs = np.random.randint(0, 10, size=(batch_size, 10), dtype=np.int64)
+    >>> input_mask = np.random.randint(0, 2, size=(batch_size, 10), dtype=np.int64)
+    >>> outputs = model(input_seqs, is_train=True)
+    >>> loss = tl.cost.cross_entropy_seq_with_mask(outputs, target_seqs, input_mask)
 
     """
     targets = tf.reshape(target_seqs, [-1])  # to one vector
-    weights = tf.to_float(tf.reshape(input_mask, [-1]))  # to one vector like targets
+    weights = tf.cast(tf.reshape(input_mask, [-1]), dtype=tf.float32)  # to one vector like targets
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=targets, name=name) * weights
-    #losses = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=targets, name=name)) # for TF1.0 and others
+    # losses = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=targets, name=name)) # for TF1.0 and others
 
-    # try: ## TF1.0
     loss = tf.divide(
         tf.reduce_sum(losses),  # loss from mask. reduce_sum before element-wise mul with mask !!
         tf.reduce_sum(weights),
-        name="seq_loss_with_mask")
-    # except: ## TF0.12
-    #     loss = tf.div(tf.reduce_sum(losses),   # loss from mask. reduce_sum before element-wise mul with mask !!
-    #                     tf.reduce_sum(weights),
-    #                     name="seq_loss_with_mask")
+        name="seq_loss_with_mask"
+    )
+
     if return_details:
         return loss, losses, weights, targets
     else:
@@ -479,24 +534,18 @@ def cosine_similarity(v1, v2):
     v1, v2 : Tensor
         Tensor with the same shape [batch_size, n_feature].
 
-    Returns
-    -------
-    Tensor
-        a tensor of shape [batch_size].
-
     References
     ----------
-    - `<https://en.wikipedia.org/wiki/Cosine_similarity>`__.
+    - `Wiki <https://en.wikipedia.org/wiki/Cosine_similarity>`__.
 
     """
-    # try: ## TF1.0
-    cost = tf.reduce_sum(tf.multiply(v1, v2), 1) / (tf.sqrt(tf.reduce_sum(tf.multiply(v1, v1), 1)) * tf.sqrt(tf.reduce_sum(tf.multiply(v2, v2), 1)))
-    # except: ## TF0.12
-    #     cost = tf.reduce_sum(tf.mul(v1, v2), reduction_indices=1) / (tf.sqrt(tf.reduce_sum(tf.mul(v1, v1), reduction_indices=1)) * tf.sqrt(tf.reduce_sum(tf.mul(v2, v2), reduction_indices=1)))
-    return cost
+
+    return tf.reduce_sum(tf.multiply(v1, v2), 1) / \
+        (tf.sqrt(tf.reduce_sum(tf.multiply(v1, v1), 1)) *
+         tf.sqrt(tf.reduce_sum(tf.multiply(v2, v2), 1)))
 
 
-## Regularization Functions
+# Regularization Functions
 def li_regularizer(scale, scope=None):
     """Li regularization removes the neurons of previous layer. The `i` represents `inputs`.
     Returns a function that can be used to apply group li regularization to weights.
@@ -518,11 +567,6 @@ def li_regularizer(scale, scope=None):
     ValueError : if scale is outside of the range [0.0, 1.0] or if scale is not a float.
 
     """
-    import numbers
-    from tensorflow.python.framework import ops
-    from tensorflow.python.ops import standard_ops
-    # from tensorflow.python.platform import tf_logging as logging
-
     if isinstance(scale, numbers.Integral):
         raise ValueError('scale cannot be an integer: %s' % scale)
     if isinstance(scale, numbers.Real):
@@ -542,7 +586,10 @@ def li_regularizer(scale, scope=None):
             #     standard_ops_fn = standard_ops.mul
             # else:
             standard_ops_fn = standard_ops.multiply
-            return standard_ops_fn(my_scale, standard_ops.reduce_sum(standard_ops.sqrt(standard_ops.reduce_sum(tf.square(weights), 1))), name=scope)
+            return standard_ops_fn(
+                my_scale, standard_ops.reduce_sum(standard_ops.sqrt(standard_ops.reduce_sum(tf.square(weights), 1))),
+                name=scope
+            )
 
     return li
 
@@ -566,13 +613,9 @@ def lo_regularizer(scale):
     ValueError : If scale is outside of the range [0.0, 1.0] or if scale is not a float.
 
     """
-    import numbers
-    from tensorflow.python.framework import ops
-    from tensorflow.python.ops import standard_ops
-    # from tensorflow.python.platform import tf_logging as logging
-
     if isinstance(scale, numbers.Integral):
         raise ValueError('scale cannot be an integer: %s' % scale)
+
     if isinstance(scale, numbers.Real):
         if scale < 0.:
             raise ValueError('Setting a scale less than 0 on a regularizer: %g' % scale)
@@ -590,7 +633,10 @@ def lo_regularizer(scale):
             #     standard_ops_fn = standard_ops.mul
             # else:
             standard_ops_fn = standard_ops.multiply
-            return standard_ops_fn(my_scale, standard_ops.reduce_sum(standard_ops.sqrt(standard_ops.reduce_sum(tf.square(weights), 0))), name=scope)
+            return standard_ops_fn(
+                my_scale, standard_ops.reduce_sum(standard_ops.sqrt(standard_ops.reduce_sum(tf.square(weights), 0))),
+                name=scope
+            )
 
     return lo
 
@@ -615,12 +661,9 @@ def maxnorm_regularizer(scale=1.0):
     ValueError : If scale is outside of the range [0.0, 1.0] or if scale is not a float.
 
     """
-    import numbers
-    from tensorflow.python.framework import ops
-    from tensorflow.python.ops import standard_ops
-
     if isinstance(scale, numbers.Integral):
         raise ValueError('scale cannot be an integer: %s' % scale)
+
     if isinstance(scale, numbers.Real):
         if scale < 0.:
             raise ValueError('Setting a scale less than 0 on a regularizer: %g' % scale)
@@ -663,12 +706,9 @@ def maxnorm_o_regularizer(scale):
     ValueError : If scale is outside of the range [0.0, 1.0] or if scale is not a float.
 
     """
-    import numbers
-    from tensorflow.python.framework import ops
-    from tensorflow.python.ops import standard_ops
-
     if isinstance(scale, numbers.Integral):
         raise ValueError('scale cannot be an integer: %s' % scale)
+
     if isinstance(scale, numbers.Real):
         if scale < 0.:
             raise ValueError('Setting a scale less than 0 on a regularizer: %g' % scale)
@@ -687,7 +727,9 @@ def maxnorm_o_regularizer(scale):
                 standard_ops_fn = standard_ops.mul
             else:
                 standard_ops_fn = standard_ops.multiply
-            return standard_ops_fn(my_scale, standard_ops.reduce_sum(standard_ops.reduce_max(standard_ops.abs(weights), 0)), name=scope)
+            return standard_ops_fn(
+                my_scale, standard_ops.reduce_sum(standard_ops.reduce_max(standard_ops.abs(weights), 0)), name=scope
+            )
 
     return mn_o
 
@@ -711,12 +753,9 @@ def maxnorm_i_regularizer(scale):
     ValueError : If scale is outside of the range [0.0, 1.0] or if scale is not a float.
 
     """
-    import numbers
-    from tensorflow.python.framework import ops
-    from tensorflow.python.ops import standard_ops
-
     if isinstance(scale, numbers.Integral):
         raise ValueError('scale cannot be an integer: %s' % scale)
+
     if isinstance(scale, numbers.Real):
         if scale < 0.:
             raise ValueError('Setting a scale less than 0 on a regularizer: %g' % scale)
@@ -735,6 +774,87 @@ def maxnorm_i_regularizer(scale):
                 standard_ops_fn = standard_ops.mul
             else:
                 standard_ops_fn = standard_ops.multiply
-            return standard_ops_fn(my_scale, standard_ops.reduce_sum(standard_ops.reduce_max(standard_ops.abs(weights), 1)), name=scope)
+            return standard_ops_fn(
+                my_scale, standard_ops.reduce_sum(standard_ops.reduce_max(standard_ops.abs(weights), 1)), name=scope
+            )
 
     return mn_i
+
+
+def huber_loss(
+        output, target, is_mean=True, delta=1.0, dynamichuber=False, reverse=False, axis=-1, epsilon=0.00001, name=None
+):
+    """Huber Loss operation, see ``https://en.wikipedia.org/wiki/Huber_loss`` .
+    Reverse Huber Loss operation, see  ''https://statweb.stanford.edu/~owen/reports/hhu.pdf''.
+    Dynamic Reverse Huber Loss operation, see  ''https://arxiv.org/pdf/1606.00373.pdf''.
+
+    Parameters
+    ----------
+    output : Tensor
+        A distribution with shape: [batch_size, ....], (any dimensions).
+    target : Tensor
+        The target distribution, format the same with `output`.
+    is_mean : boolean
+        Whether compute the mean or sum for each example.
+        - If True, use ``tf.reduce_mean`` to compute the loss between one target and predict data (default).
+        - If False, use ``tf.reduce_sum``.
+    delta: float
+        The point where the huber loss function changes from a quadratic to linear.
+    dynamichuber: boolean
+        Whether compute the coefficient c for each batch.
+        - If True, c is 20% of the maximal per-batch error.
+        - If False, c is delta.
+    reverse: boolean
+        Whether compute the reverse huber loss.
+    axis : int or list of int
+        The dimensions to reduce.
+    epsilon:
+        Eplison.
+    name : string
+        Name of this loss.
+
+    """
+    if reverse:
+        if dynamichuber:
+            huber_c = 0.2 * tf.reduce_max(tf.abs(output - target))
+        else:
+            huber_c = delta
+        if is_mean:
+            loss = tf.reduce_mean(
+                tf.where(
+                    tf.less_equal(tf.abs(output - target), huber_c), tf.abs(output - target),
+                    tf.multiply(
+                        tf.pow(output - target, 2.0) + tf.pow(huber_c, 2.0),
+                        tf.math.divide_no_nan(.5, huber_c + epsilon)
+                    )
+                ), name=name
+            )
+        else:
+            loss = tf.reduce_mean(
+                tf.reduce_sum(
+                    tf.where(
+                        tf.less_equal(tf.abs(output - target), huber_c), tf.abs(output - target),
+                        tf.multiply(
+                            tf.pow(output - target, 2.0) + tf.pow(huber_c, 2.0),
+                            tf.math.divide_no_nan(.5, huber_c + epsilon)
+                        )
+                    ), axis
+                ), name=name
+            )
+    elif is_mean:
+        loss = tf.reduce_mean(
+            tf.where(
+                tf.less_equal(tf.abs(output - target), delta), 0.5 * tf.pow(output - target, 2),
+                delta * (tf.abs(output - target) - 0.5 * delta)
+            ), name=name
+        )
+    else:
+        loss = tf.reduce_mean(
+            tf.reduce_sum(
+                tf.where(
+                    tf.less_equal(tf.abs(output - target), delta), 0.5 * tf.pow(output - target, 2),
+                    delta * (tf.abs(output - target) - 0.5 * delta)
+                ), axis
+            ), name=name
+        )
+    return loss
